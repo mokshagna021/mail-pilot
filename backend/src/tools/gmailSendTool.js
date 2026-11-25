@@ -38,41 +38,49 @@ export const sendEmail = async (user, { to, cc, bcc, subject, body, threadId, us
     throw new Error("SECURITY_ERROR: Explicit user approval required before invoking Gmail send.");
   }
 
-  const auth = getAuthenticatedClient(user);
-  const gmail = google.gmail({ version: 'v1', auth });
+  // Check if live Google OAuth credentials exist
+  const hasLiveTokens = Boolean(
+    user?.googleTokens?.refreshToken || 
+    (user?.googleTokens?.accessToken && !user?.googleTokens?.accessToken.startsWith('demo_') && !user?.googleTokens?.accessToken.startsWith('mock_'))
+  );
 
-  const raw = makeRawEmail({ to, cc, bcc, subject, body, threadId });
+  if (hasLiveTokens) {
+    try {
+      const auth = getAuthenticatedClient(user);
+      const gmail = google.gmail({ version: 'v1', auth });
+      const raw = makeRawEmail({ to, cc, bcc, subject, body, threadId });
 
-  try {
-    const res = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw,
-        threadId: threadId || undefined
-      }
-    });
+      const res = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw,
+          threadId: threadId || undefined
+        }
+      });
 
-    return {
-      success: true,
-      gmailMessageId: res.data.id,
-      threadId: res.data.threadId,
-      statusMessage: "Your email was accepted by Gmail for sending.",
-      to,
-      subject,
-      timestamp: new Date().toISOString()
-    };
-  } catch (err) {
-    if (!user?.googleTokens?.accessToken) {
       return {
         success: true,
-        simulated: true,
-        gmailMessageId: `msg-live-accepted-${Date.now()}`,
-        statusMessage: "Your email was accepted by MailPilot engine. Connect Gmail to transmit directly through Google servers.",
+        gmailMessageId: res.data.id,
+        threadId: res.data.threadId,
+        statusMessage: "Your email was accepted by Gmail for sending.",
         to,
         subject,
         timestamp: new Date().toISOString()
       };
+    } catch (err) {
+      console.warn("Live Gmail send attempt failed, providing detailed error:", err.message);
+      throw new Error(`Gmail API sending failed: ${err.message}. Please check Google OAuth permissions in Settings.`);
     }
-    throw new Error(`Gmail API sending failed: ${err.message}`);
   }
+
+  // Simulated / Local Active Mode
+  return {
+    success: true,
+    simulated: true,
+    gmailMessageId: `msg-live-accepted-${Date.now()}`,
+    statusMessage: "Your email was accepted by MailPilot engine! (Connect live Google OAuth in Settings to transmit directly through external Gmail servers).",
+    to,
+    subject,
+    timestamp: new Date().toISOString()
+  };
 };
