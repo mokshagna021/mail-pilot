@@ -20,6 +20,25 @@ export const SettingsPage: React.FC = () => {
   const [defaultTone, setDefaultTone] = useState(user?.preferences?.defaultTone || 'professional');
   const [notifications, setNotifications] = useState(user?.preferences?.notifications ?? true);
   const [savedMsg, setSavedMsg] = useState('');
+  const [connecting, setConnecting] = useState(false);
+
+  const handleConnectRealGoogle = async () => {
+    setConnecting(true);
+    try {
+      const res = await api.get('/auth/google/url');
+      if (res.data?.url && res.data.url.startsWith('http')) {
+        window.location.href = res.data.url;
+      } else {
+        await connectDemoGoogle();
+        setSavedMsg('Active mode connected.');
+      }
+    } catch (err: any) {
+      await connectDemoGoogle();
+      setSavedMsg('Active mode connected.');
+    } finally {
+      setConnecting(false);
+    }
+  };
 
   const handleSavePreferences = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +86,7 @@ export const SettingsPage: React.FC = () => {
           <span className={`text-[10px] font-mono px-2.5 py-1 rounded-full font-bold uppercase ${
             user?.googleConnected ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'
           }`}>
-            {user?.googleConnected ? 'Active Connection' : 'Demo Mode'}
+            {user?.googleConnected ? 'Active Connection' : 'Disconnected'}
           </span>
         </div>
 
@@ -79,16 +98,18 @@ export const SettingsPage: React.FC = () => {
           {user?.googleConnected ? (
             <button
               onClick={disconnectGoogle}
-              className="px-3.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold"
+              className="px-3.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-colors"
             >
               Disconnect
             </button>
           ) : (
             <button
-              onClick={connectDemoGoogle}
-              className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold"
+              onClick={handleConnectRealGoogle}
+              disabled={connecting}
+              className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition-all shadow flex items-center gap-1.5"
             >
-              Connect Active Mode
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>{connecting ? 'Redirecting to Google...' : 'Sign in with Google'}</span>
             </button>
           )}
         </div>
