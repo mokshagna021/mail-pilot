@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   Trash2, 
@@ -8,7 +8,8 @@ import {
   CheckCircle2, 
   User, 
   Save, 
-  ExternalLink 
+  ExternalLink,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
@@ -20,7 +21,28 @@ export const SettingsPage: React.FC = () => {
   const [defaultTone, setDefaultTone] = useState(user?.preferences?.defaultTone || 'professional');
   const [notifications, setNotifications] = useState(user?.preferences?.notifications ?? true);
   const [savedMsg, setSavedMsg] = useState('');
+  const [savedMsgType, setSavedMsgType] = useState<'success' | 'error'>('success');
   const [connecting, setConnecting] = useState(false);
+
+  // Handle OAuth redirect back from Google
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const googleEmail = params.get('googleEmail');
+    const error = params.get('error');
+
+    if (connected === 'true') {
+      setSavedMsgType('success');
+      setSavedMsg(`✅ Google account connected successfully${googleEmail ? ': ' + googleEmail : ''}! You can now send real emails.`);
+      refreshUser(); // Refresh user state to show googleConnected: true
+      // Clean up URL params
+      window.history.replaceState({}, '', '/settings');
+    } else if (error) {
+      setSavedMsgType('error');
+      setSavedMsg('❌ Google connection failed: ' + decodeURIComponent(error));
+      window.history.replaceState({}, '', '/settings');
+    }
+  }, []);
 
   const handleConnectRealGoogle = async () => {
     setConnecting(true);
@@ -65,8 +87,8 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {savedMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-950/50 border border-emerald-700/50 text-emerald-300 text-xs flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4" />
+        <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${savedMsgType === 'error' ? 'bg-red-950/50 border-red-700/50 text-red-300' : 'bg-emerald-950/50 border-emerald-700/50 text-emerald-300'}`}>
+          {savedMsgType === 'error' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
           <span>{savedMsg}</span>
         </div>
       )}

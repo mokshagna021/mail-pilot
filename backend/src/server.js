@@ -13,8 +13,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Allow multiple origins: local dev + Vercel production
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Render health checks)
+    if (!origin) return callback(null, true);
+    // Allow any vercel.app subdomain
+    if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('CORS: Origin not allowed: ' + origin));
+  },
   credentials: true
 }));
 
@@ -33,18 +48,16 @@ app.get('/api/health', (req, res) => {
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/mailpilot';
   try {
-    await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 2000
-    });
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
     console.log('MongoDB connected successfully to:', uri);
   } catch (err) {
     console.warn('MongoDB connection warning:', err.message);
-    console.log('Starting in standalone resilient mode with memory/fallback handlers.');
+    console.log('Starting in standalone resilient mode with in-memory store.');
   }
 };
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`MailPilot AI backend server running on port ${PORT}`);
+    console.log(`MailPilot AI backend running on port ${PORT}`);
   });
 });

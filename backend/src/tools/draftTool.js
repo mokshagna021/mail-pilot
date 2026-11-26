@@ -11,10 +11,10 @@ export const createDraftSchema = z.object({
   threadId: z.string().optional().describe("Optional threadId if replying")
 });
 
-const makeRawEmail = ({ to, cc, bcc, subject, body, threadId }) => {
+const makeRawEmail = ({ to, cc, bcc, subject, body }) => {
   const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
   const messageParts = [
-    `To: ${to.join(', ')}`,
+    `To: ${Array.isArray(to) ? to.join(', ') : to}`,
     cc && cc.length ? `Cc: ${cc.join(', ')}` : '',
     bcc && bcc.length ? `Bcc: ${bcc.join(', ')}` : '',
     'Content-Type: text/html; charset=utf-8',
@@ -33,12 +33,34 @@ const makeRawEmail = ({ to, cc, bcc, subject, body, threadId }) => {
 };
 
 export const createDraft = async (user, { to, cc, bcc, subject, body, threadId }) => {
-  const auth = getAuthenticatedClient(user);
-  const gmail = google.gmail({ version: 'v1', auth });
+  // Check if live Google OAuth credentials exist
+  const hasLiveTokens = Boolean(
+    user?.googleTokens?.refreshToken ||
+    (user?.googleTokens?.accessToken &&
+      !user?.googleTokens?.accessToken.startsWith('demo_') &&
+      !user?.googleTokens?.accessToken.startsWith('mock_'))
+  );
 
-  const raw = makeRawEmail({ to, cc, bcc, subject, body, threadId });
+  // --- SIMULATED MODE (no real Google token) ---
+  if (!hasLiveTokens) {
+    console.log('[draftTool] No live Google token — saving draft locally (simulated).');
+    return {
+      success: true,
+      simulated: true,
+      draftId: `draft-local-${Date.now()}`,
+      status: 'Draft saved in MailPilot workspace (connect Gmail in Settings to sync to Gmail)',
+      to,
+      subject,
+      preview: (body || '').slice(0, 160)
+    };
+  }
 
+  // --- LIVE GMAIL MODE ---
   try {
+    const auth = getAuthenticatedClient(user);
+    const gmail = google.gmail({ version: 'v1', auth });
+    const raw = makeRawEmail({ to: Array.isArray(to) ? to : [to], cc, bcc, subject, body });
+
     const res = await gmail.users.drafts.create({
       userId: 'me',
       requestBody: {
@@ -59,14 +81,15 @@ export const createDraft = async (user, { to, cc, bcc, subject, body, threadId }
       preview: body.slice(0, 160)
     };
   } catch (err) {
+    console.warn('[draftTool] Live Gmail draft failed, falling back to local save:', err.message);
     return {
       success: true,
       simulated: true,
       draftId: `draft-local-${Date.now()}`,
-      status: 'Draft saved in MailPilot workspace (connect Gmail for direct synchronization)',
+      status: 'Draft saved locally (Gmail sync failed — check OAuth permissions in Settings)',
       to,
       subject,
-      preview: body.slice(0, 160)
+      preview: (body || '').slice(0, 160)
     };
   }
 };

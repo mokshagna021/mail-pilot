@@ -21,6 +21,7 @@ export const ComposerPage: React.FC = () => {
   const [instruction, setInstruction] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [isError, setIsError] = useState(false);
 
   const handleAiAction = async (action: string, tone = 'professional') => {
     setAiLoading(true);
@@ -57,12 +58,14 @@ export const ComposerPage: React.FC = () => {
         subject,
         body
       });
-      setStatusMsg('Your email was accepted by Gmail for sending.');
+      setIsError(false);
+      setStatusMsg('✅ Email sent successfully!');
       setTo('');
       setSubject('');
       setBody('');
     } catch (err: any) {
-      setStatusMsg(err.response?.data?.error || 'Sending failed.');
+      setIsError(true);
+      setStatusMsg('❌ ' + (err.response?.data?.error || 'Send failed — is the backend server running?'));
     } finally {
       setAiLoading(false);
     }
@@ -77,9 +80,11 @@ export const ComposerPage: React.FC = () => {
         subject,
         body
       });
-      setStatusMsg('Draft saved in MailPilot & synced with Gmail.');
+      setIsError(false);
+      setStatusMsg('✅ Draft saved successfully!');
     } catch (err: any) {
-      setStatusMsg('Draft save failed.');
+      setIsError(true);
+      setStatusMsg('❌ ' + (err.response?.data?.error || 'Draft save failed — is the backend server running?'));
     } finally {
       setAiLoading(false);
     }
@@ -95,7 +100,7 @@ export const ComposerPage: React.FC = () => {
       </div>
 
       {statusMsg && (
-        <div className="p-3.5 rounded-xl bg-violet-950/60 border border-violet-500/30 text-violet-200 text-xs flex items-center gap-2">
+        <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${isError ? 'bg-red-950/60 border-red-500/30 text-red-200' : 'bg-violet-950/60 border-violet-500/30 text-violet-200'}`}>
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           <span>{statusMsg}</span>
         </div>
