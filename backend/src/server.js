@@ -45,6 +45,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'MailPilot AI Backend', timestamp: new Date() });
 });
 
+// Debug: show what redirect URI the backend is using (safe to expose - no secrets)
+app.get('/api/debug-oauth', (req, res) => {
+  res.json({
+    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+    FRONTEND_URL: process.env.FRONTEND_URL,
+    GOOGLE_CLIENT_ID_prefix: (process.env.GOOGLE_CLIENT_ID || '').slice(0, 20) + '...'
+  });
+});
+
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/mailpilot';
   try {
